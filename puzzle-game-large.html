@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İkonlu Puzzle Oyunu</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            padding: 20px;
+        }
+
+        .game-container {
+            background-color: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 0 auto;
+            max-width: 95vw;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            font-size: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr); /* 10x10 board */
+            gap: 5px;
+            margin-bottom: 20px;
+        }
+
+        .tile {
+            aspect-ratio: 1;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: white;
+        }
+
+        .tile:hover {
+            transform: scale(1.05);
+            z-index: 1;
+        }
+
+        .tile.matched {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .tile.selected {
+            border: 3px solid #FFD700; /* Altın renkli kalın kenarlık */
+            transform: scale(1.1);
+        }
+
+        .reset-button {
+            width: 100%;
+            padding: 15px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .reset-button:hover {
+            background-color: #357abd;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <div class="score">Skor: <span id="score">0</span></div>
+            <div class="timer">Süre: <span id="timer">120</span></div>
+        </div>
+        <div class="grid" id="gameGrid"></div>
+        <button class="reset-button" onclick="resetGame()">
+            <i class="fas fa-redo"></i> Yeniden Başla
+        </button>
+    </div>
+
+    <script>
+        const tileConfigs = [
+            { color: '#FF4136', icon: 'fa-heart' },
+            { color: '#2ECC40', icon: 'fa-tree' },
+            { color: '#0074D9', icon: 'fa-star' },
+            { color: '#FFDC00', icon: 'fa-sun' },
+            { color: '#B10DC9', icon: 'fa-moon' },
+            { color: '#FF851B', icon: 'fa-fire' },
+            { color: '#01FF70', icon: 'fa-leaf' },
+            { color: '#7FDBFF', icon: 'fa-snowflake' },
+            { color: '#F012BE', icon: 'fa-crown' },
+            { color: '#001F3F', icon: 'fa-anchor' },
+            { color: '#39CCCC', icon: 'fa-fish' },
+            { color: '#85144B', icon: 'fa-apple-alt' },
+            { color: '#3D9970', icon: 'fa-paw' },
+            { color: '#FF4136', icon: 'fa-bell' },
+            { color: '#B10DC9', icon: 'fa-diamond' },
+            { color: '#01FF70', icon: 'fa-feather' },
+            { color: '#FF851B', icon: 'fa-bolt' },
+            { color: '#7FDBFF', icon: 'fa-cloud' },
+            { color: '#F012BE', icon: 'fa-gift' },
+            { color: '#39CCCC', icon: 'fa-key' }
+        ];
+
+        let score = 0;
+        let timeLeft = 120;
+        let timer;
+        let selectedTiles = [];
+        let matchedPairs = 0;
+        const totalTiles = 100; // 10x10
+
+        function createTileConfigs() {
+            let allConfigs = [];
+            tileConfigs.slice(0, totalTiles / 2).forEach(config => {
+                allConfigs.push(config, config); // Her konfigürasyondan iki tane ekle
+            });
+            return shuffle(allConfigs);
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function createBoard() {
+            const grid = document.getElementById('gameGrid');
+            grid.innerHTML = '';
+            const shuffledConfigs = createTileConfigs();
+
+            shuffledConfigs.forEach((config, index) => {
+                const tile = document.createElement('button');
+                tile.className = 'tile';
+                tile.style.backgroundColor = config.color;
+                tile.innerHTML = `<i class="fas ${config.icon}"></i>`;
+                tile.dataset.color = config.color;
+                tile.dataset.icon = config.icon;
+                tile.dataset.index = index;
+                tile.onclick = () => handleTileClick(tile);
+                grid.appendChild(tile);
+            });
+        }
+
+        function handleTileClick(tile) {
+            if (selectedTiles.length === 2 || selectedTiles.includes(tile) || 
+                tile.classList.contains('matched')) return;
+
+            tile.classList.add('selected');
+            selectedTiles.push(tile);
+
+            if (selectedTiles.length === 2) {
+                setTimeout(checkMatch, 500);
+            }
+        }
+
+        function checkMatch() {
+            const [tile1, tile2] = selectedTiles;
+            const match = tile1.dataset.color === tile2.dataset.color && 
+                         tile1.dataset.icon === tile2.dataset.icon;
+
+            if (match) {
+                tile1.classList.add('matched');
+                tile2.classList.add('matched');
+                score += 10;
+                document.getElementById('score').textContent = score;
+                matchedPairs++;
+
+                if (matchedPairs === totalTiles / 2) {
+                    endGame(true);
+                }
+            } else {
+                tile1.classList.remove('selected');
+                tile2.classList.remove('selected');
+            }
+
+            selectedTiles = [];
+        }
+
+        function startTimer() {
+            timer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').textContent = timeLeft;
+
+                if (timeLeft <= 0) {
+                    endGame(false);
+                }
+            }, 1000);
+        }
+
+        function endGame(won) {
+            clearInterval(timer);
+            const message = won ? 
+                `Tebrikler! Tüm eşleştirmeleri buldunuz! Skorunuz: ${score}` : 
+                `Süre doldu! Skorunuz: ${score}`;
+            alert(message);
+        }
+
+        function resetGame() {
+            clearInterval(timer);
+            score = 0;
+            timeLeft = 120;
+            matchedPairs = 0;
+            selectedTiles = [];
+
+            document.getElementById('score').textContent = score;
+            document.getElementById('timer').textContent = timeLeft;
+
+            createBoard();
+            startTimer();
+        }
+
+        // Oyunu başlat
+        resetGame();
+    </script>
+</body>
+</html>
